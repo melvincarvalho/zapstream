@@ -522,6 +522,7 @@
                 let recipient = 'Unknown';
                 let message = '';
                 let bolt11 = '';
+                let zappedEventId = null;
                 
                 event.tags.forEach(tag => {
                     if (tag[0] === 'description') {
@@ -533,6 +534,9 @@
                     }
                     if (tag[0] === 'p') {
                         recipient = this.formatPubkey(tag[1]);
+                    }
+                    if (tag[0] === 'e') {
+                        zappedEventId = tag[1];
                     }
                     if (tag[0] === 'bolt11') {
                         bolt11 = tag[1];
@@ -547,7 +551,8 @@
                         recipient,
                         message,
                         timestamp: event.created_at * 1000,
-                        id: event.id
+                        id: event.id,
+                        zappedEventId: zappedEventId
                     };
                 }
                 
@@ -587,7 +592,7 @@
                     zapCard.classList.add('filtered');
                 }
                 
-                const eventUrl = this.generateEventUrl(zapData.id);
+                const eventUrl = this.generateEventUrl(zapData.zappedEventId || zapData.id);
                 
                 zapCard.innerHTML = `
                     <div class="zap-amount">${zapData.amount.toLocaleString()} sats</div>
@@ -595,7 +600,7 @@
                     <div class="zap-recipient">To: ${zapData.recipient}</div>
                     ${zapData.message ? `<div class="zap-message">"${zapData.message}"</div>` : ''}
                     <div class="zap-time">${new Date(zapData.timestamp).toLocaleString()}</div>
-                    <a href="${eventUrl}" target="_blank" class="zap-link">View Event</a>
+                    <a href="${eventUrl}" target="_blank" class="zap-link">${zapData.zappedEventId ? 'View Zapped Event' : 'View Zap Receipt'}</a>
                 `;
                 
                 container.insertBefore(zapCard, container.firstChild);

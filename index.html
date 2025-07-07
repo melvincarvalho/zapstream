@@ -304,6 +304,30 @@
         .zap-card.filtered {
             display: none;
         }
+        
+        .zap-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: #3498db;
+            text-decoration: none;
+            font-size: 0.8rem;
+            padding: 5px 10px;
+            background: rgba(52, 152, 219, 0.1);
+            border-radius: 15px;
+            transition: all 0.3s ease;
+            margin-top: 5px;
+        }
+        
+        .zap-link:hover {
+            background: rgba(52, 152, 219, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        .zap-link::before {
+            content: "🔗";
+            font-size: 0.7rem;
+        }
     </style>
 </head>
 <body>
@@ -563,12 +587,15 @@
                     zapCard.classList.add('filtered');
                 }
                 
+                const eventUrl = this.generateEventUrl(zapData.id);
+                
                 zapCard.innerHTML = `
                     <div class="zap-amount">${zapData.amount.toLocaleString()} sats</div>
                     <div class="zap-sender">From: ${zapData.sender}</div>
                     <div class="zap-recipient">To: ${zapData.recipient}</div>
                     ${zapData.message ? `<div class="zap-message">"${zapData.message}"</div>` : ''}
                     <div class="zap-time">${new Date(zapData.timestamp).toLocaleString()}</div>
+                    <a href="${eventUrl}" target="_blank" class="zap-link">View Event</a>
                 `;
                 
                 container.insertBefore(zapCard, container.firstChild);
@@ -665,6 +692,106 @@
                 
                 document.getElementById('visibleCount').textContent = visibleCards.length;
                 document.getElementById('hiddenCount').textContent = hiddenCards.length;
+            }
+            
+            generateEventUrl(eventId) {
+                const encodedId = this.encodeNevent(eventId);
+                return `https://nostr.eu/${encodedId}`;
+            }
+            
+            encodeNevent(eventId) {
+                try {
+                    const hexBytes = this.hexToBytes(eventId);
+                    const bech32 = this.bech32Encode('nevent', hexBytes);
+                    return bech32;
+                } catch (error) {
+                    console.error('Error encoding nevent:', error);
+                    return `https://nostr.eu/${eventId}`;
+                }
+            }
+            
+            hexToBytes(hex) {
+                const bytes = [];
+                for (let i = 0; i < hex.length; i += 2) {
+                    bytes.push(parseInt(hex.substr(i, 2), 16));
+                }
+                return new Uint8Array(bytes);
+            }
+            
+            bech32Encode(hrp, data) {
+                const CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+                const BECH32_CONST = 1;
+                
+                const values = this.convertBits(data, 8, 5, true);
+                const checksum = this.bech32CreateChecksum(hrp, values);
+                const combined = values.concat(checksum);
+                
+                return hrp + '1' + combined.map(v => CHARSET[v]).join('');
+            }
+            
+            convertBits(data, fromBits, toBits, pad) {
+                let acc = 0;
+                let bits = 0;
+                const ret = [];
+                const maxv = (1 << toBits) - 1;
+                
+                for (let i = 0; i < data.length; i++) {
+                    const value = data[i];
+                    if (value < 0 || value >> fromBits !== 0) {
+                        throw new Error('Invalid data');
+                    }
+                    acc = (acc << fromBits) | value;
+                    bits += fromBits;
+                    while (bits >= toBits) {
+                        bits -= toBits;
+                        ret.push((acc >> bits) & maxv);
+                    }
+                }
+                
+                if (pad) {
+                    if (bits > 0) {
+                        ret.push((acc << (toBits - bits)) & maxv);
+                    }
+                } else if (bits >= fromBits || ((acc << (toBits - bits)) & maxv)) {
+                    throw new Error('Invalid padding');
+                }
+                
+                return ret;
+            }
+            
+            bech32CreateChecksum(hrp, data) {
+                const values = this.bech32HrpExpand(hrp).concat(data).concat([0, 0, 0, 0, 0, 0]);
+                const mod = this.bech32Polymod(values) ^ 1;
+                const ret = [];
+                for (let i = 0; i < 6; i++) {
+                    ret.push((mod >> (5 * (5 - i))) & 31);
+                }
+                return ret;
+            }
+            
+            bech32HrpExpand(hrp) {
+                const ret = [];
+                for (let i = 0; i < hrp.length; i++) {
+                    ret.push(hrp.charCodeAt(i) >> 5);
+                }
+                ret.push(0);
+                for (let i = 0; i < hrp.length; i++) {
+                    ret.push(hrp.charCodeAt(i) & 31);
+                }
+                return ret;
+            }
+            
+            bech32Polymod(values) {
+                const GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+                let chk = 1;
+                for (let i = 0; i < values.length; i++) {
+                    const top = chk >> 25;
+                    chk = (chk & 0x1ffffff) << 5 ^ values[i];
+                    for (let j = 0; j < 5; j++) {
+                        chk ^= ((top >> j) & 1) ? GENERATOR[j] : 0;
+                    }
+                }
+                return chk;
             }
         }
         

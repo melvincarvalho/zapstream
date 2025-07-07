@@ -701,8 +701,15 @@
             
             encodeNevent(eventId) {
                 try {
-                    const hexBytes = this.hexToBytes(eventId);
-                    const bech32 = this.bech32Encode('nevent', hexBytes);
+                    const eventIdBytes = this.hexToBytes(eventId);
+                    if (eventIdBytes.length !== 32) {
+                        throw new Error('Event ID must be 32 bytes');
+                    }
+                    
+                    // Create TLV data: [type, length, ...data]
+                    // Type 0 = event ID, length = 32 bytes
+                    const tlvData = [0, 32, ...eventIdBytes];
+                    const bech32 = this.bech32Encode('nevent', new Uint8Array(tlvData));
                     return bech32;
                 } catch (error) {
                     console.error('Error encoding nevent:', error);

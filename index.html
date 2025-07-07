@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nostr Zaps Live</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .title {
+            font-size: 3rem;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 20px;
+        }
+        
+        .status {
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .status.connecting {
+            background: #ffeaa7;
+            color: #e17055;
+        }
+        
+        .status.connected {
+            background: #55efc4;
+            color: #00b894;
+        }
+        
+        .status.disconnected {
+            background: #ff7675;
+            color: #d63031;
+        }
+        
+        .zaps-container {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        }
+        
+        .zap-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            transform: translateY(20px);
+            opacity: 0;
+            animation: slideIn 0.5s ease forwards;
+            border-left: 4px solid #f39c12;
+        }
+        
+        @keyframes slideIn {
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .zap-amount {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #f39c12;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .zap-amount::before {
+            content: "⚡";
+            font-size: 1.5rem;
+        }
+        
+        .zap-sender {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+        
+        .zap-recipient {
+            color: #7f8c8d;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .zap-message {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-style: italic;
+            color: #495057;
+        }
+        
+        .zap-time {
+            font-size: 0.8rem;
+            color: #95a5a6;
+            text-align: right;
+        }
+        
+        .stats {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-around;
+            color: white;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .relay-list {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: white;
+        }
+        
+        .relay-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 0;
+            font-size: 0.9rem;
+        }
+        
+        .relay-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #95a5a6;
+        }
+        
+        .relay-status.connected {
+            background: #00b894;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: rgba(255,255,255,0.7);
+        }
+        
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .filter-section {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: white;
+        }
+        
+        .filter-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .filter-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .slider-container {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .slider-value {
+            font-weight: bold;
+            color: #f39c12;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.2);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #f39c12;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #f39c12;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        
+        .filter-stats {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        
+        .filter-stat {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .reset-button {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.3s ease;
+        }
+        
+        .reset-button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .zap-card.filtered {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">⚡ Nostr Zaps Live</h1>
+            <p class="subtitle">Real-time Lightning Network tips on Nostr</p>
+        </div>
+        
+        <div class="status connecting" id="status">
+            Connecting to relays...
+        </div>
+        
+        <div class="stats" id="stats">
+            <div class="stat-item">
+                <span class="stat-value" id="totalZaps">0</span>
+                <span class="stat-label">Total Zaps</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="totalSats">0</span>
+                <span class="stat-label">Total Sats</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="zapsPerMin">0</span>
+                <span class="stat-label">Zaps/Min</span>
+            </div>
+        </div>
+        
+        <div class="filter-section">
+            <div class="filter-title">
+                🔍 Filter Zaps
+            </div>
+            <div class="filter-controls">
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Minimum Amount:</span>
+                        <span class="slider-value" id="sliderValue">0 sats</span>
+                    </div>
+                    <input type="range" id="zapFilter" class="slider" min="0" max="100" value="0" step="1">
+                </div>
+                <div class="filter-stats">
+                    <div class="filter-stat">
+                        <span>📊 Showing:</span>
+                        <span id="visibleCount">0</span>
+                    </div>
+                    <div class="filter-stat">
+                        <span>🚫 Hidden:</span>
+                        <span id="hiddenCount">0</span>
+                    </div>
+                </div>
+                <button class="reset-button" id="resetFilter">Reset Filter</button>
+            </div>
+        </div>
+        
+        <div class="relay-list" id="relayList">
+            <h3>Connected Relays</h3>
+            <div id="relayItems"></div>
+        </div>
+        
+        <div class="zaps-container" id="zapsContainer">
+            <div class="empty-state">
+                <h3>⚡ Waiting for zaps...</h3>
+                <p>Lightning tips will appear here in real-time</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class NostrZapsApp {
+            constructor() {
+                this.relays = [
+                    'wss://relay.damus.io',
+                    'wss://nostr.wine',
+                    'wss://relay.snort.social',
+                    'wss://nos.lol',
+                    'wss://relay.nostr.band'
+                ];
+                
+                this.sockets = new Map();
+                this.stats = {
+                    totalZaps: 0,
+                    totalSats: 0,
+                    zapsThisMinute: 0,
+                    lastMinute: Math.floor(Date.now() / 60000)
+                };
+                
+                this.minZapAmount = 0;
+                this.allZaps = [];
+                
+                this.init();
+            }
+            
+            init() {
+                this.connectToRelays();
+                this.updateStats();
+                this.setupFilterControls();
+                setInterval(() => this.updateZapsPerMinute(), 60000);
+            }
+            
+            connectToRelays() {
+                const relayItems = document.getElementById('relayItems');
+                relayItems.innerHTML = '';
+                
+                this.relays.forEach(relay => {
+                    this.connectToRelay(relay);
+                    
+                    const relayItem = document.createElement('div');
+                    relayItem.className = 'relay-item';
+                    relayItem.innerHTML = `
+                        <div class="relay-status" id="status-${relay}"></div>
+                        <span>${relay}</span>
+                    `;
+                    relayItems.appendChild(relayItem);
+                });
+            }
+            
+            connectToRelay(relay) {
+                try {
+                    const ws = new WebSocket(relay);
+                    
+                    ws.onopen = () => {
+                        console.log(`Connected to ${relay}`);
+                        this.updateRelayStatus(relay, 'connected');
+                        this.subscribeToZaps(ws);
+                        this.updateConnectionStatus();
+                    };
+                    
+                    ws.onmessage = (event) => {
+                        this.handleMessage(JSON.parse(event.data));
+                    };
+                    
+                    ws.onclose = () => {
+                        console.log(`Disconnected from ${relay}`);
+                        this.updateRelayStatus(relay, 'disconnected');
+                        this.sockets.delete(relay);
+                        this.updateConnectionStatus();
+                        
+                        setTimeout(() => this.connectToRelay(relay), 5000);
+                    };
+                    
+                    ws.onerror = (error) => {
+                        console.error(`Error connecting to ${relay}:`, error);
+                        this.updateRelayStatus(relay, 'disconnected');
+                    };
+                    
+                    this.sockets.set(relay, ws);
+                } catch (error) {
+                    console.error(`Failed to connect to ${relay}:`, error);
+                    this.updateRelayStatus(relay, 'disconnected');
+                }
+            }
+            
+            subscribeToZaps(ws) {
+                const subscription = JSON.stringify([
+                    "REQ",
+                    "zaps",
+                    {
+                        "kinds": [9735],
+                        "since": Math.floor(Date.now() / 1000) - 3600
+                    }
+                ]);
+                
+                ws.send(subscription);
+            }
+            
+            handleMessage(message) {
+                if (message[0] === "EVENT" && message[2] && message[2].kind === 9735) {
+                    this.processZap(message[2]);
+                }
+            }
+            
+            processZap(event) {
+                try {
+                    const zapData = this.parseZapEvent(event);
+                    if (zapData) {
+                        this.allZaps.unshift(zapData);
+                        if (this.allZaps.length > 200) {
+                            this.allZaps = this.allZaps.slice(0, 200);
+                        }
+                        this.displayZap(zapData);
+                        this.updateStatsWithZap(zapData);
+                        this.updateFilterStats();
+                    }
+                } catch (error) {
+                    console.error('Error processing zap:', error);
+                }
+            }
+            
+            parseZapEvent(event) {
+                let amount = 0;
+                let sender = 'Unknown';
+                let recipient = 'Unknown';
+                let message = '';
+                let bolt11 = '';
+                
+                event.tags.forEach(tag => {
+                    if (tag[0] === 'description') {
+                        try {
+                            const desc = JSON.parse(tag[1]);
+                            if (desc.content) message = desc.content;
+                            if (desc.pubkey) sender = this.formatPubkey(desc.pubkey);
+                        } catch (e) {}
+                    }
+                    if (tag[0] === 'p') {
+                        recipient = this.formatPubkey(tag[1]);
+                    }
+                    if (tag[0] === 'bolt11') {
+                        bolt11 = tag[1];
+                        amount = this.extractAmountFromBolt11(bolt11);
+                    }
+                });
+                
+                if (amount > 0) {
+                    return {
+                        amount,
+                        sender,
+                        recipient,
+                        message,
+                        timestamp: event.created_at * 1000,
+                        id: event.id
+                    };
+                }
+                
+                return null;
+            }
+            
+            extractAmountFromBolt11(bolt11) {
+                const match = bolt11.match(/\d+[munp]?/);
+                if (!match) return 0;
+                
+                const value = match[0];
+                const amount = parseInt(value.replace(/[munp]/, ''));
+                
+                if (value.includes('m')) return amount * 100000;
+                if (value.includes('u')) return amount * 100;
+                if (value.includes('n')) return amount * 0.1;
+                if (value.includes('p')) return amount * 0.0001;
+                
+                return amount;
+            }
+            
+            formatPubkey(pubkey) {
+                return pubkey.slice(0, 8) + '...' + pubkey.slice(-8);
+            }
+            
+            displayZap(zapData) {
+                const container = document.getElementById('zapsContainer');
+                const emptyState = container.querySelector('.empty-state');
+                if (emptyState) emptyState.remove();
+                
+                const zapCard = document.createElement('div');
+                zapCard.className = 'zap-card';
+                zapCard.dataset.amount = zapData.amount;
+                zapCard.dataset.id = zapData.id;
+                
+                if (zapData.amount < this.minZapAmount) {
+                    zapCard.classList.add('filtered');
+                }
+                
+                zapCard.innerHTML = `
+                    <div class="zap-amount">${zapData.amount.toLocaleString()} sats</div>
+                    <div class="zap-sender">From: ${zapData.sender}</div>
+                    <div class="zap-recipient">To: ${zapData.recipient}</div>
+                    ${zapData.message ? `<div class="zap-message">"${zapData.message}"</div>` : ''}
+                    <div class="zap-time">${new Date(zapData.timestamp).toLocaleString()}</div>
+                `;
+                
+                container.insertBefore(zapCard, container.firstChild);
+                
+                if (container.children.length > 50) {
+                    container.removeChild(container.lastChild);
+                }
+            }
+            
+            updateStatsWithZap(zapData) {
+                this.stats.totalZaps++;
+                this.stats.totalSats += zapData.amount;
+                
+                const currentMinute = Math.floor(Date.now() / 60000);
+                if (currentMinute === this.stats.lastMinute) {
+                    this.stats.zapsThisMinute++;
+                } else {
+                    this.stats.zapsThisMinute = 1;
+                    this.stats.lastMinute = currentMinute;
+                }
+                
+                this.updateStats();
+            }
+            
+            updateStats() {
+                document.getElementById('totalZaps').textContent = this.stats.totalZaps.toLocaleString();
+                document.getElementById('totalSats').textContent = this.stats.totalSats.toLocaleString();
+                document.getElementById('zapsPerMin').textContent = this.stats.zapsThisMinute;
+            }
+            
+            updateZapsPerMinute() {
+                this.stats.zapsThisMinute = 0;
+                this.stats.lastMinute = Math.floor(Date.now() / 60000);
+                this.updateStats();
+            }
+            
+            updateRelayStatus(relay, status) {
+                const statusElement = document.getElementById(`status-${relay}`);
+                if (statusElement) {
+                    statusElement.className = `relay-status ${status}`;
+                }
+            }
+            
+            updateConnectionStatus() {
+                const statusElement = document.getElementById('status');
+                const connectedCount = Array.from(this.sockets.values()).filter(ws => ws.readyState === WebSocket.OPEN).length;
+                
+                if (connectedCount === 0) {
+                    statusElement.textContent = 'Disconnected from all relays';
+                    statusElement.className = 'status disconnected';
+                } else {
+                    statusElement.textContent = `Connected to ${connectedCount} of ${this.relays.length} relays`;
+                    statusElement.className = 'status connected';
+                }
+            }
+            
+            setupFilterControls() {
+                const slider = document.getElementById('zapFilter');
+                const sliderValue = document.getElementById('sliderValue');
+                const resetButton = document.getElementById('resetFilter');
+                
+                slider.addEventListener('input', (e) => {
+                    this.minZapAmount = parseInt(e.target.value);
+                    sliderValue.textContent = `${this.minZapAmount} sats`;
+                    this.applyFilter();
+                });
+                
+                resetButton.addEventListener('click', () => {
+                    this.minZapAmount = 0;
+                    slider.value = 0;
+                    sliderValue.textContent = '0 sats';
+                    this.applyFilter();
+                });
+            }
+            
+            applyFilter() {
+                const zapCards = document.querySelectorAll('.zap-card');
+                zapCards.forEach(card => {
+                    const amount = parseInt(card.dataset.amount);
+                    if (amount >= this.minZapAmount) {
+                        card.classList.remove('filtered');
+                    } else {
+                        card.classList.add('filtered');
+                    }
+                });
+                
+                this.updateFilterStats();
+            }
+            
+            updateFilterStats() {
+                const zapCards = document.querySelectorAll('.zap-card');
+                const visibleCards = document.querySelectorAll('.zap-card:not(.filtered)');
+                const hiddenCards = document.querySelectorAll('.zap-card.filtered');
+                
+                document.getElementById('visibleCount').textContent = visibleCards.length;
+                document.getElementById('hiddenCount').textContent = hiddenCards.length;
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            new NostrZapsApp();
+        });
+    </script>
+</body>
+</html>
